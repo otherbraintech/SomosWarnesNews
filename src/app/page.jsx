@@ -21,23 +21,23 @@ function HomePage() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#03969d]/5 via-white to-white"></div>
         </div>
 
-        <div className="w-full max-w-4xl mx-auto text-center space-y-4 sm:space-y-8 relative z-10">
+        <div className="w-full max-w-4xl mx-auto text-center space-y-3 sm:space-y-6 relative z-10">
           {/* Logo Section - Much smaller and more elegant */}
           <div className="relative inline-block w-full px-4">
             <div className="absolute -inset-8 bg-[#03969d]/5 rounded-full blur-3xl"></div>
             <Image
-              src="https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png"
+              src="https://i.postimg.cc/D0hkwB76/somos-Warnes-Logo.png"
               alt="Somos Warnes - Mario Cronenbold"
-              width={400}
-              height={180}
-              className="w-full h-auto max-w-[200px] sm:max-w-[300px] md:max-w-[400px] mx-auto object-contain drop-shadow-xl transition-all duration-700 hover:scale-[1.02]"
+              width={300}
+              height={300}
+              className="w-full h-auto max-w-[140px] sm:max-w-[200px] md:max-w-[280px] mx-auto object-contain drop-shadow-xl transition-all duration-700 hover:scale-[1.02]"
               priority
               unoptimized
             />
           </div>
 
           {/* Value Proposition */}
-          <div className="space-y-4 px-4">
+          <div className="space-y-3 px-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#03969d]/10 text-[#03969d] rounded-full">
               <span className="w-1.2 h-1.2 bg-[#03969d] rounded-full animate-pulse"></span>
               <span className="text-[9px] font-black uppercase tracking-widest">Somos Warnes - Mario Cronenbold</span>
@@ -54,7 +54,7 @@ function HomePage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-4 flex flex-col items-center gap-6">
+          <div className="pt-2 flex flex-col items-center gap-4">
             <a
               href={session ? "/dashboard" : "/auth/login"}
               className="group relative flex items-center justify-center gap-3 px-8 py-4 bg-[#03969d] text-white rounded-2xl font-black text-[10px] sm:text-xs tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 shadow-xl shadow-teal-100 hover:opacity-90 hover:scale-105 active:scale-95"

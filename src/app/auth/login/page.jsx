@@ -85,7 +85,7 @@ function LoginPage() {
         <div className="p-8 sm:p-12">
           <div className="flex flex-col items-center mb-10">
             <Image
-              src="https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png"
+              src="https://i.postimg.cc/D0hkwB76/somos-Warnes-Logo.png"
               alt="Somos Warnes Noticias"
               width={160}
               height={60}

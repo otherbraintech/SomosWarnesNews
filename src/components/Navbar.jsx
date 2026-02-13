@@ -30,7 +30,7 @@ export default function Navbar() {
         <div className="flex items-center">
           <Link href="/" className="transition-transform hover:scale-105 active:scale-95">
             <Image
-              src="https://i.postimg.cc/4y2g2XQ7/SOMOSW-ARNES-Logo-(2).png"
+              src="https://i.postimg.cc/JzYL5NQy/somos-Warnes-Logo-Light.png"
               alt="Somos Warnes Noticias"
               width={100}
               height={30}
@@ -58,13 +58,7 @@ export default function Navbar() {
                 <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">Usuario</span>
                 <span className="text-xs font-bold text-white leading-tight">{session.user.name || "Administrador"}</span>
               </div>
-              <Image
-                src="https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png"
-                alt="Logo Navbar"
-                width={80}
-                height={30}
-                className="w-auto h-8 sm:h-10 opacity-90 hover:opacity-100 transition-opacity hidden sm:block mr-2"
-              />
+
               <SignOutButton />
             </div>
           )}

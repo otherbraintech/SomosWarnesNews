@@ -70,7 +70,7 @@ export function usePDFGenerator(noticias) {
   // Función mejorada para obtener la imagen de respaldo
   async function getFallbackImage() {
     try {
-      const fallbackUrl = "https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png";
+      const fallbackUrl = "https://i.postimg.cc/D0hkwB76/somos-Warnes-Logo.png";
       console.log('Cargando imagen por defecto:', fallbackUrl);
       
       const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(fallbackUrl)}`);
@@ -143,7 +143,7 @@ export function usePDFGenerator(noticias) {
       // Cargar el logo de Somos Warnes con manejo de errores
       let logoSomosWarnes = null;
       try {
-        logoSomosWarnes = await getBase64ImageFromUrl("https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png");
+        logoSomosWarnes = await getBase64ImageFromUrl("https://i.postimg.cc/D0hkwB76/somos-Warnes-Logo.png");
       } catch (error) {
         console.error("Error cargando logo Somos Warnes:", error);
         // Continuar sin logo si hay error
@@ -328,7 +328,7 @@ export function usePDFGenerator(noticias) {
       // Si la URL no es válida, usar imagen por defecto
       if (!isValidImageUrl) {
         console.log(`URL de imagen inválida para noticia ${noticia.id}, usando imagen por defecto`);
-        imagenUrl = "https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png";
+        imagenUrl = "https://i.postimg.cc/D0hkwB76/somos-Warnes-Logo.png";
       }
 
       const imgData = await getBase64ImageFromUrl(imagenUrl);
