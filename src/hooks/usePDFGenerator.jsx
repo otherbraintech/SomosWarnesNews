@@ -1,0 +1,509 @@
+import { useState } from "react";
+import jsPDF from "jspdf";
+
+export function usePDFGenerator(noticias) {
+  const [generando, setGenerando] = useState(false);
+  const [errorGen, setErrorGen] = useState(null);
+  const [noticiasDescartadas, setNoticiasDescartadas] = useState([]);
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [pdfPendiente, setPdfPendiente] = useState(null);
+
+  // Función mejorada para obtener imágenes con mejor manejo de errores
+  async function getBase64ImageFromUrl(imageUrl) {
+    // Validación más estricta de la URL
+    const isValidUrl = imageUrl && 
+                      typeof imageUrl === 'string' && 
+                      imageUrl.trim() !== '' && 
+                      (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
+    
+    // Si la URL no es válida, usar imagen por defecto inmediatamente
+    if (!isValidUrl) {
+      console.log('URL de imagen inválida o faltante, usando imagen por defecto');
+      return await getFallbackImage();
+    }
+
+    try {
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+      console.log('Intentando cargar imagen:', imageUrl);
+      
+      // Timeout para evitar esperas largas
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos timeout
+      
+      const response = await fetch(proxyUrl, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error('Error en la respuesta del servidor:', response.status, response.statusText);
+        throw new Error(`Error ${response.status}: No se pudo cargar imagen`);
+      }
+      
+      const blob = await response.blob();
+      
+      // Verificar que el blob no esté vacío y sea una imagen
+      if (blob.size === 0) {
+        throw new Error("Imagen vacía o corrupta");
+      }
+
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          console.log('Imagen cargada exitosamente:', imageUrl);
+          resolve(reader.result);
+        };
+        reader.onerror = () => {
+          console.error('Error al leer el blob de la imagen:', imageUrl);
+          reject(new Error("Error al procesar imagen"));
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error("Error al cargar la imagen:", error);
+      // En caso de cualquier error, devolver la imagen por defecto
+      return await getFallbackImage();
+    }
+  }
+
+  // Función mejorada para obtener la imagen de respaldo
+  async function getFallbackImage() {
+    try {
+      const fallbackUrl = "https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png";
+      console.log('Cargando imagen por defecto:', fallbackUrl);
+      
+      const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(fallbackUrl)}`);
+      if (!response.ok) throw new Error("No se pudo cargar imagen de respaldo");
+      
+      const blob = await response.blob();
+      
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Error al leer imagen de respaldo"));
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error("Error al cargar la imagen de respaldo:", error);
+      // Si incluso la imagen de respaldo falla, devolver null
+      return null;
+    }
+  }
+
+  async function generarBoletin() {
+    setGenerando(true);
+    setErrorGen(null);
+
+    try {
+      // Usar directamente las noticias que recibe el hook (por ejemplo, desde useNews
+      if (!Array.isArray(noticias)) {
+        throw new Error("No hay noticias disponibles para generar el boletín");
+      }
+
+      const noticiasAprobadas = noticias.filter((n) => {
+        if (!n?.estado) return false;
+        const estado = String(n.estado).toLowerCase();
+        return estado === "aprobada" || estado === "aprobado";
+      });
+
+      if (noticiasAprobadas.length === 0) {
+        setErrorGen("No hay noticias aprobadas para generar el boletín.");
+        setGenerando(false);
+        return;
+      }
+
+      // Array para rastrear noticias descartadas por errores
+      const noticiasDescartadas = [];
+
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      let y = margin;
+
+      // ====== FRANJAS DE COLOR EN CABECERA ======
+      const franja1Height = 8; // Primera franja más gruesa (turquesa)
+      const franja2Height = 16;  // Segunda franja más delgada (roja)
+      
+      // Asegurarse de que no hay margen superior para las franjas
+      y = 0;
+      
+      // Primera franja: #03969d (turquesa teal)
+      doc.setFillColor(3, 150, 157); 
+      doc.rect(0, y, pageWidth, franja1Height, "F");
+      
+      // Segunda franja: #FFFFFF (blanco)
+      doc.setFillColor(255, 255, 255); 
+      doc.rect(0, y + franja1Height, pageWidth, franja2Height, "F");
+      
+      // Ajustar posición Y después de las franjas - Menos padding
+      y = (franja1Height + franja2Height) + 10;
+
+      // Cargar el logo de Somos Warnes con manejo de errores
+      let logoSomosWarnes = null;
+      try {
+        logoSomosWarnes = await getBase64ImageFromUrl("https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png");
+      } catch (error) {
+        console.error("Error cargando logo Somos Warnes:", error);
+        // Continuar sin logo si hay error
+      }
+
+      // Configuración del logo - más alto y menos ancho
+      const logoWidth = 90; // Ancho ajustado a proporción 1:1
+      const logoHeight = 90; // Altura igual al ancho para fuente de 1024x1024
+      const logoY = y;
+      const logoX = (pageWidth - logoWidth) / 2; // Centrar el logo horizontalmente
+
+      // Agregar logo Somos Warnes (centrado) si se cargó correctamente
+      if (logoSomosWarnes) {
+        doc.addImage(
+          logoSomosWarnes,
+          "PNG",
+          logoX,
+          logoY,
+          logoWidth,
+          logoHeight
+        );
+      }
+
+      // Fecha y hora centradas más abajo
+      const fechaHora = new Date().toLocaleString("es-ES", {
+        dateStyle: "full",
+        timeStyle: "short",
+      });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor("#6c757d");
+      doc.text(fechaHora, pageWidth / 2, logoY + logoHeight + 15, { align: "center" });
+
+      // Calcular la altura total del encabezado
+      const headerHeight = logoY + logoHeight + 10; 
+      y = headerHeight + 15; // Reducir espacio entre encabezado y contenido
+
+      // Primera página: máximo 2 noticias
+      let noticiasEnPrimeraPagina = Math.min(noticiasAprobadas.length, 2);
+      
+      let noticiasProcesamientoExitoso = 0;
+      for (let i = 0; i < noticiasEnPrimeraPagina; i++) {
+        const noticia = noticiasAprobadas[i];
+        try {
+          // Primera página usa un margen superior mayor por el encabezado
+          y = await agregarNoticiaAPDF(doc, noticia, y, pageWidth, margin, true);
+          noticiasProcesamientoExitoso++;
+        } catch (error) {
+          console.error(`Error procesando noticia:`, error);
+          noticiasDescartadas.push({ titulo: noticia.titulo || "Sin título", error: error.message });
+        }
+      }
+
+      // Otras páginas: máximo 3 noticias
+      if (noticiasAprobadas.length > 2) {
+        doc.addPage();
+        y = margin + 30; // Margen superior para páginas interiores
+        let noticiasEnPaginaActual = 0;
+
+        for (let i = 2; i < noticiasAprobadas.length; i++) {
+          const noticia = noticiasAprobadas[i];
+          
+          if (noticiasEnPaginaActual === 3) {
+            doc.addPage();
+            y = margin + 30;
+            noticiasEnPaginaActual = 0;
+          }
+
+          try {
+            y = await agregarNoticiaAPDF(doc, noticia, y, pageWidth, margin, false);
+            noticiasEnPaginaActual++;
+            noticiasProcesamientoExitoso++;
+          } catch (error) {
+            console.error(`Error procesando noticia:`, error);
+            noticiasDescartadas.push({ titulo: noticia.titulo || "Sin título", error: error.message });
+          }
+        }
+      }
+
+      // Nombre del archivo PDF
+      const meses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+      const fechaActual = new Date();
+      const dia = fechaActual.getDate();
+      const sufijo = dia === 1 ? "ro" : "";
+      const mes = meses[fechaActual.getMonth()];
+      const nombrePDF = `SomosWarnesNoticias-${dia}${sufijo} de ${mes}`;
+
+      // Verificar si se procesó al menos una noticia
+      if (noticiasProcesamientoExitoso === 0) {
+        throw new Error("No se pudo procesar ninguna noticia para el PDF");
+      }
+
+      // Si hay noticias descartadas, mostrar modal antes de descargar
+      if (noticiasDescartadas.length > 0) {
+        console.warn(`Se descartaron ${noticiasDescartadas.length} noticias por errores:`, noticiasDescartadas);
+        setNoticiasDescartadas(noticiasDescartadas);
+        setPdfPendiente({ doc, nombrePDF });
+        setMostrarModal(true);
+      } else {
+        // Si no hay noticias descartadas, descargar directamente
+        doc.save(`${nombrePDF}.pdf`);
+      }
+    } catch (e) {
+      console.error(e);
+      setErrorGen("Error generando PDF: " + e.message);
+    } finally {
+      setGenerando(false);
+    }
+  }
+
+  async function agregarNoticiaAPDF(doc, noticia, y, pageWidth, margin, isCompact = false) {
+    // Validaciones básicas
+    if (!noticia) {
+      throw new Error("Noticia es null o undefined");
+    }
+    
+    if (!noticia.titulo || typeof noticia.titulo !== 'string') {
+      throw new Error("Noticia no tiene título válido");
+    }
+
+    const boxWidth = pageWidth - margin * 2;
+    const padding = isCompact ? 15 : 10; // Menos padding en páginas interiores
+    let cursorY = y + padding;
+
+    // Estilo de la caja
+    doc.setDrawColor("#e0e0e0");
+    doc.setFillColor("#ffffff");
+    doc.setLineWidth(1);
+
+    // Metadatos con manejo seguro de fecha
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor("#000000");
+    
+    let fechaPub = "Fecha no disponible";
+    try {
+      if (noticia.fecha_publicacion) {
+        const fecha = new Date(noticia.fecha_publicacion);
+        if (!isNaN(fecha.getTime())) {
+          fechaPub = fecha.toLocaleDateString();
+        }
+      }
+    } catch (error) {
+      console.warn("Error procesando fecha de publicación:", error);
+    }
+    
+    const metaText = `${fechaPub} | Autor: ${noticia.autor || "Desconocido"}`;
+    doc.text(metaText, margin + padding, cursorY);
+    cursorY += 18;
+
+    // Título con validación
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(isCompact ? 13 : 11); // Título un poco más pequeño en páginas interiores
+    doc.setTextColor("#03969d"); // Principal Somos Warnes
+    
+    let tituloSeguro = noticia.titulo.trim();
+    if (tituloSeguro.length > 200) {
+      tituloSeguro = tituloSeguro.substring(0, 197) + "...";
+    }
+    
+    const titleLines = doc.splitTextToSize(tituloSeguro, boxWidth - padding * 2);
+    doc.text(titleLines, margin + padding, cursorY);
+    cursorY += titleLines.length * (isCompact ? 18 : 14); // Menos espacio entre líneas en páginas interiores
+
+    // MEJORA PRINCIPAL: Manejo robusto de imágenes
+    let imagenProcesada = false;
+    let alturaImagen = 0;
+
+    // Siempre intentar cargar una imagen (ya sea la original o la por defecto)
+    try {
+      let imagenUrl = noticia.imagen;
+      
+      // Validar URL de imagen
+      const isValidImageUrl = imagenUrl && 
+                            typeof imagenUrl === 'string' && 
+                            imagenUrl.trim() !== '' && 
+                            (imagenUrl.startsWith('http://') || imagenUrl.startsWith('https://'));
+      
+      // Si la URL no es válida, usar imagen por defecto
+      if (!isValidImageUrl) {
+        console.log(`URL de imagen inválida para noticia ${noticia.id}, usando imagen por defecto`);
+        imagenUrl = "https://i.postimg.cc/jd47T0m6/SOMOSW-ARNES-Logo-(1).png";
+      }
+
+      const imgData = await getBase64ImageFromUrl(imagenUrl);
+      
+      if (imgData) {
+        // Deja solo un pequeño margen a los lados
+        const sideMargin = 12;
+        const maxImgWidth = boxWidth - sideMargin * 2;
+        
+        // Crear elemento imagen para obtener dimensiones
+        const imgObj = new Image();
+        imgObj.src = imgData;
+        
+        await new Promise((resolve, reject) => {
+          imgObj.onload = () => {
+            try {
+              // Calcular dimensiones manteniendo la relación de aspecto
+              const imgAspectRatio = imgObj.width / imgObj.height;
+              let imgWidth = maxImgWidth;
+              let imgHeight = imgWidth / imgAspectRatio;
+              
+              // Si la imagen es muy alta, limitar su altura
+              const maxImgHeight = isCompact ? 140 : 105; // Más pequeña aún para asegurar 3 por página
+              if (imgHeight > maxImgHeight) {
+                imgHeight = maxImgHeight;
+                imgWidth = imgHeight * imgAspectRatio;
+              }
+              
+              // Asegurarse de que la imagen no sea más ancha que el máximo permitido
+              if (imgWidth > maxImgWidth) {
+                imgWidth = maxImgWidth;
+                imgHeight = imgWidth / imgAspectRatio;
+              }
+              
+              // Calcular posición X para centrar la imagen
+              const imgX = (pageWidth - imgWidth) / 2;
+              
+              // Agregar espacio antes de la imagen
+              cursorY += 5;
+              
+              // Marco para la imagen (sutil sombra)
+              doc.setFillColor("#f8fafc");
+              doc.roundedRect(
+                imgX - 4,
+                cursorY - 4,
+                imgWidth + 8,
+                imgHeight + 8,
+                8,
+                8,
+                "F"
+              );
+              
+              // Agregar la imagen al PDF
+              doc.addImage(
+                imgData,
+                'JPEG',
+                imgX,
+                cursorY,
+                imgWidth,
+                imgHeight
+              );
+              
+              // Actualizar la posición Y después de la imagen
+              alturaImagen = imgHeight + 18;
+              cursorY += alturaImagen;
+              imagenProcesada = true;
+              resolve();
+            } catch (error) {
+              console.error("Error al agregar imagen al PDF:", error);
+              resolve(); // Continuar sin la imagen
+            }
+          };
+          imgObj.onerror = () => {
+            console.error("Error al cargar imagen para dimensiones");
+            resolve(); // Continuar sin la imagen
+          };
+          // Timeout para evitar esperas infinitas
+          setTimeout(resolve, 3000);
+        });
+      }
+    } catch (error) {
+      console.warn(`Error procesando imagen para noticia ${noticia.id || 'desconocido'}:`, error);
+      // Continuar sin imagen - la imagen por defecto ya debería haberse cargado
+    }
+
+    // Resumen (limitado para evitar solapamiento) con validación
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(11);
+    doc.setTextColor("#000000");
+    
+    let resumenMostrar = "";
+    try {
+      resumenMostrar = noticia.resumen_ia || noticia.resumen || "Sin resumen disponible";
+      if (typeof resumenMostrar !== 'string') {
+        resumenMostrar = String(resumenMostrar);
+      }
+      // Limpiar caracteres problemáticos
+      resumenMostrar = resumenMostrar.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
+    } catch (error) {
+      console.warn("Error procesando resumen:", error);
+      resumenMostrar = "Error procesando resumen";
+    }
+    
+    let resumenLines = doc.splitTextToSize(resumenMostrar, boxWidth - padding * 2);
+    // Ajustar número de líneas para que quepan 3 por página
+    const maxResumenLines = isCompact ? 5 : 3; 
+
+    if (resumenLines.length > maxResumenLines) {
+      resumenLines = resumenLines.slice(0, maxResumenLines);
+      resumenLines[maxResumenLines - 1] += " ...";
+    }
+    doc.text(resumenLines, margin + padding, cursorY);
+    cursorY += resumenLines.length * (isCompact ? 13 : 12) + 6; // Menos espacio en páginas interiores
+
+    // Leer más con validación de URL
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor("#03969d"); // Principal Somos Warnes
+    
+    let urlSegura = "#";
+    try {
+      if (noticia.url && typeof noticia.url === 'string' && noticia.url.trim()) {
+        urlSegura = noticia.url.trim();
+      }
+    } catch (error) {
+      console.warn("Error procesando URL:", error);
+    }
+    
+    doc.textWithLink("VER NOTICIA ORIGINAL", margin + padding, cursorY, {
+      url: urlSegura,
+    });
+    cursorY += 15;
+
+    // Calcular altura de la caja dinámicamente según el contenido
+    let boxHeightReal;
+    if (isCompact) {
+      // Para modo compacto (primera página), un poco más alto para que la noticia se vea más grande
+      boxHeightReal = imagenProcesada ? 290 : 205;
+    } else {
+      // Para modo normal, usar altura real del contenido
+      boxHeightReal = cursorY - y + padding;
+    }
+    
+    doc.setDrawColor("#e0e0e0"); // gris claro
+    doc.setLineWidth(1.2);
+    doc.roundedRect(margin, y, boxWidth, boxHeightReal, 12, 12, "S");
+
+    // Espaciado después de la caja
+    const espaciadoDespues = isCompact ? 15 : 8; 
+
+    return y + boxHeightReal + espaciadoDespues;
+  }
+
+  const confirmarYDescargar = () => {
+    if (pdfPendiente) {
+      pdfPendiente.doc.save(`${pdfPendiente.nombrePDF}.pdf`);
+      setPdfPendiente(null);
+    }
+    setMostrarModal(false);
+    setNoticiasDescartadas([]);
+  };
+
+  const cerrarModal = () => {
+    setMostrarModal(false);
+    setNoticiasDescartadas([]);
+    setPdfPendiente(null);
+  };
+
+  return { 
+    generarBoletin, 
+    generando, 
+    errorGen, 
+    noticiasDescartadas,
+    mostrarModal,
+    confirmarYDescargar,
+    cerrarModal
+  };
+}
