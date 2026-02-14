@@ -36,18 +36,8 @@ export default function NewsCard({ noticia, manejarEstado, estaActualizando }) {
           </div>
         )}
         
-        {/* Category Badge if exists */}
-        {noticia.categoria && (
-          <div className="absolute top-3 left-3">
-            <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm ${
-              ['MAMEN', 'MARIO'].includes(noticia.categoria.toUpperCase())
-                ? 'bg-[#03969d] text-white' 
-                : 'bg-gray-800 text-white'
-            }`}>
-              {noticia.categoria}
-            </span>
-          </div>
-        )}
+
+
       </div>
 
       <div className="p-4 sm:p-5 flex flex-col flex-grow">
